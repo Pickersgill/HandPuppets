@@ -1,4 +1,6 @@
-from tkinter import Tk, Frame, Canvas, Button, Entry, Label
+from tkinter import Tk, Frame, Canvas, Button, Entry, Label, PhotoImage
+from block_canvas import BlockCanvas
+import tkinter as tk
 import style as st
 
 LEFT = "left"
@@ -7,24 +9,25 @@ TOP = "top"
 BOTTOM = "bottom"
 
 class View(Frame):
-    """ 
-    Acts as the View in an MVC pattern. This class extends tkinter.Frame.
-    The View object defines the layout of the UI and assigns the correct Controller actions to each
-    button and hotkey.
 
-    Attributes:
-        parent : the Tk root object which the View frame is contained within.
-        canvas : the tkinter.Canvas object which the LSystem productions will be drawn to.
-    """
     def __init__(self, parent, m):
+        self.load_resources()
         Frame.__init__(self, parent)
         self.parent = parent
+        self.model = m
         self.pack()
         self.configure(height=600, width=800)
-        self.init_block_bar()
+        self.block_palette = self.init_block_bar()
         self.init_properties_bar()
         self.canvas = self.init_canvas()
+        self.init_key_binds()
 
+    def init_key_binds(self):
+        self.parent.bind('<Control-q>', lambda x : exit())
+        self.parent.bind('<Control-v>', lambda x : self.rebuild_vars())
+
+    def load_resources(self):
+        self.PLUS_IMG = PhotoImage(file=st.PLUS_IMG_PATH)
 
     def init_block_bar(self):
         block_frame = Frame(self)
@@ -36,21 +39,72 @@ class View(Frame):
         block_label = Label(top_bar, text="Block Selector", bg=st.BLOCK_LABEL)
         block_label.grid(column=0,row=0, sticky="NSEW")
 
-        tab_frame = Frame(top_bar)
-        tab_frame.grid(column=0,row=1)
-        
-        var_tab = Button(tab_frame,text="Vars", bg=st.VAR_TAB)
-        var_tab.grid(column=0,row=0)
-
-        obj_tab = Button(tab_frame,text="Obj", bg=st.OBJ_TAB)
-        obj_tab.grid(column=1,row=0)
-
-        func_tab = Button(tab_frame,text="Funcs", bg=st.FUNC_TAB)
-        func_tab.grid(column=2,row=0)
-
         array_frame = Frame(block_frame, bg=st.ARRAY_BG)
         array_frame.pack(side=BOTTOM, expand=True, fill="both")
 
+        tab_frame = Frame(top_bar)
+        tab_frame.grid(column=0,row=1)
+        
+        var_tab = Button(tab_frame,text="Vars.", bg=st.VAR_TAB, 
+            command=self.rebuild_vars)
+        var_tab.grid(column=0,row=0)
+
+        obj_tab = Button(tab_frame,text="Obj.", bg=st.OBJ_TAB)
+        obj_tab.grid(column=1,row=0)
+
+        func_tab = Button(tab_frame,text="Funcs.", bg=st.FUNC_TAB)
+        func_tab.grid(column=2,row=0)
+
+        return array_frame
+
+    def add_var_popup(self):
+        popup = tk.Toplevel()
+        popup.title("Add Variable")
+    
+        popup.configure(width=200)
+    
+        var_label = Label(popup, text="Variable Name")
+        var_label.grid(row=0,column=0)
+
+        entry = Entry(popup, bd=5)
+        entry.grid(row=0,column=1)
+
+        submit_button = Button(popup, text="Add"
+            ,command=lambda : self.resolve_add_var(popup, entry))
+
+        submit_button.grid(row=1,column=0, columnspan=2)
+
+    def resolve_add_var(self, popup, entry):
+        # TODO SANITIZE THE VARNAME
+        self.model.add_var(entry.get())
+        popup.destroy()
+        self.rebuild_vars()
+        
+    
+    def rebuild_vars(self):
+        old_widgets = self.block_palette.winfo_children()
+        for child in old_widgets:
+            child.destroy()
+
+        bp = self.block_palette
+
+        for var in self.model.get_vars():
+            self.build_var_button(var)
+
+        add_var_popup = Button(bp, text = 'New Variable', 
+            image = self.PLUS_IMG, 
+            compound=LEFT,
+            command=self.add_var_popup)
+        add_var_popup.pack(side=TOP, padx=10, pady=10)
+        
+    def build_var_button(self, var):
+        b = Button(self.block_palette, text=var.display_name, bg=var.colour
+            ,command=lambda : self.block_clicked(var))
+        b.pack(side=TOP,padx=5,pady=5, fill="x")
+
+    def block_clicked(self, var):
+        self.canvas.add_block(var)
+    
     def init_properties_bar(self):
         prop_frame = Frame(self)
         prop_frame.configure(width=100)
@@ -71,7 +125,7 @@ class View(Frame):
         canvas_frame = Frame(self, bg=st.WORKSPACE_BORDER)
         canvas_frame.pack(side=RIGHT)
 
-        c = Canvas(canvas_frame)
+        c = BlockCanvas(canvas_frame, self.model)
         c.configure(height=600, width=800)
         c.pack(side=RIGHT, padx=10, pady=10)
 
@@ -83,18 +137,5 @@ class View(Frame):
         """
         self.canvas.delete("all")
         self.canvas.create_rectangle(0,0,800,600, fill="#FFFFFF")
-
-    def draw_line(self, line_obj):
-        """
-        Draws a line to the canvas based on the given Line object
-        """
-
-        self.canvas.create_line(
-            line_obj.startx,
-            line_obj.starty,
-            line_obj.endx,
-            line_obj.endy,
-            fill="#%02x%02x%02x" % line_obj.colour,
-            width=line_obj.width)
 
            

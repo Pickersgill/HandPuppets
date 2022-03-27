@@ -11,7 +11,6 @@ class Controller(Tk):
         self.resizable(False, False)
         self.model = Model(self)
         self.view = View(self, self.model)
-        self.view.clear_canvas()
         self.mainloop()
 
 
